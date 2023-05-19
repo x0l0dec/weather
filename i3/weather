@@ -1,0 +1,325 @@
+#!/bin/bash
+
+I1="$(ps ax | grep 'urxvt' | grep 'name weather1 -geometry 125x30' | awk -F'?' '{print $1}' | cut -c 2-)"
+I2="$(ps ax | grep 'urxvt' | grep 'name weather2 -geometry 74x32' | awk -F'?' '{print $1}' | cut -c 2-)"
+I3="$(ps ax | grep 'urxvt' | grep 'geometry 20x8-1+18 -name calendar' | awk -F'?' '{print $1}' | cut -c 2-)"
+
+case "$BLOCK_BUTTON" in
+	1)
+		if [[ -z $I1 ]]
+		then
+			kill -15 $I1 $I2 $I3
+			urxvt -name "weather1" -geometry 125x30 -e zsh -c "echo -en '\e]2;weather\a'; echo -e '\e[?1000h'; cat ~/.cache/weather | tail -31 | head -n -1 | tr '\n' ':' | sed 's/.$//' | tr ':' '\n'; tput civis; read -sk K" &
+		else
+			kill -15 $I1
+		fi
+		;;
+	3)
+		if [[ -z $I2 ]]
+		then
+			kill -15 $I1 $I2 $I3
+			urxvt -name "weather2" -geometry 74x32 -e zsh -c "echo -en '\e]2;weather\a'; echo -e '\e[?1000h'; cat ~/.cache/weather | head -n -31 | tr '\n' ':' | sed 's/.$//' | tr ':' '\n'; tput civis; read -sk K" &
+		else
+			kill -15 $I2
+		fi
+		;;
+	2|4|5)
+		~/.bin/weather
+		;;
+esac
+
+T=$(cat ~/.cache/weather | tail -1 | rev | cut -d ' ' -f 1 | cut -c 4- | rev)
+S=$(cat ~/.cache/weather | tail -1 | cut -d ',' -f 1)
+
+
+DN=$(cat ~/.cache/loc | tail -1)
+DT=$(date '+%H:%M:%S')
+
+DR="$(echo $DN | cut -d ':' -f 1 | sed 's/^0*//')$(echo $DN | cut -d ':' -f 2)$(echo $DN | cut -d ':' -f 3 | cut -d '_' -f 1)"
+DT="$(echo $DT | cut -d ':' -f 1 | sed 's/^0*//')$(echo $DT | cut -d ':' -f 2)$(echo $DT | cut -d ':' -f 3)"
+DS="$(echo $DN | cut -d ':' -f 3 | cut -d '_' -f 2 | sed 's/^0*//')$(echo $DN | cut -d ':' -f 4)$(echo $DN | cut -d ':' -f 5)"
+
+
+if [[ $S == 'Ясно' ]] || [[ $S == 'Солнечно' ]]
+then
+	if (( $DT > $DR && $DT < $DS ))
+	then
+		S="<span color='#f7fc18'><b></b></span>"
+	else
+		S="<span color='#f7fc18'><b></b></span>"
+	fi
+
+elif [[ $S == ' Переменная облачность' ]]
+then
+	if (( $DT > $DR && $DT < $DS ))
+	then
+		S="<span color='#f8f8fc'></span>"
+	else
+		S="<span font_desc='Font Awesome 5 Free' color='#f8f8fc'></span>"
+	fi
+elif [[ $S == 'Пасмурно' ]]
+then
+	S="<span color='#f8f8fc'></span>"
+
+elif [[ $S == 'Light drizzle' ]] || [[ $S == 'Слабая морось' ]]
+then
+	if (( $DT > $DR && $DT < $DS ))
+	then
+		S="<span color='#f8f8fc'></span>"
+	else
+		S="<span color='#f8f8fc'></span>"
+	fi
+elif [[ $S == 'Небольшой дождь' ]]
+then
+	if (( $DT > $DR && $DT < $DS ))
+	then
+		S="<span color='#b2b2b2'></span>"
+	else
+		S="<span color='#b2b2b2'></span>"
+	fi
+elif [[ $S == 'Дождь' ]]
+then
+	S="<span color='#b2b2b2'></span>"
+elif [[ $S == 'Light freezing rain' ]]
+then
+	S="<span color='#b2b2b2'></span>"
+elif [[ $S == 'Light rain and snow' ]] || [[ $S == 'Light freezing drizzle' ]]
+then
+	if (( $DT > $DR && $DT < $DS ))
+	then
+		S="<span color='#f8f8fc'></span> <span color='#b2b2b2'></span>"
+	else
+		S="<span color='#f8f8fc'></span> <span color='#b2b2b2'></span>"
+	fi
+
+elif [[ $S == ' Небольшой снег' ]] || [[ $S == ' Light snow' ]] || [[ $S == ' Light snow shower' ]]
+then
+	if (( $DT > $DR && $DT < $DS ))
+	then
+		S="<span color='#f8f8fc'></span> <span color='#f8f8fc'></span>"
+	else
+		S="<span color='#f8f8fc'></span> <span font_desc='Font Awesome 5 Free' color='#f8f8fc'></span>"
+	fi
+elif [[ $S == 'Снег' ]]
+then
+	S="<span color='#f8f8fc'></span>"
+elif [[ $S == 'Heavy snow shower' ]] || [[ $S == 'Snow shower' ]] || [[ $S == 'Сильный снег' ]]
+then
+	S="<span color='#f8f8fc'></span> <span color='#b2b2b2'></span>"
+
+elif [[ $S == 'Mist' ]] || [[ $S == ' Parftial fog' ]] || [[ $S == ' Туман' ]]
+then
+	S="<span color='#f8f8fc'></span>"
+
+elif [[ $S == 'Дымка' ]]
+then
+	S="<span color='#505354'></span>"
+fi
+
+
+if (( $T <= -30 ))
+then
+	COL='#0000ff'
+elif (( $T <= -29 ))
+then
+	COL='#0007ff'
+elif (( $T <= -28 ))
+then
+	COL='#000dff'
+elif (( $T <= -27 ))
+then
+	COL='#0013ff'
+elif (( $T <= -26 ))
+then
+	COL='#0018ff'
+elif (( $T <= -25 ))
+then
+	COL='#0023ff'
+elif (( $T <= -24 ))
+then
+	COL='#0028ff'
+elif (( $T <= -23 ))
+then
+	COL='#0032ff'
+elif (( $T <= -22 ))
+then
+	COL='#003bff'
+elif (( $T <= -21 ))
+then
+	COL='#0040ff'
+elif (( $T <= -20 ))
+then
+	COL='#0049ff'
+elif (( $T <= -19 ))
+then
+	COL='#004dff'
+elif (( $T <= -18 ))
+then
+	COL='#0056ff'
+elif (( $T <= -17 ))
+then
+	COL='#005aff'
+elif (( $T <= -16 ))
+then
+	COL='#0063ff'
+elif (( $T <= -15 ))
+then
+	COL='#0067ff'
+elif (( $T <= -14 ))
+then
+	COL='#0070ff'
+elif (( $T <= -13 ))
+then
+	COL='#0074ff'
+elif (( $T <= -12 ))
+then
+	COL='#007dff'
+elif (( $T <= -11 ))
+then
+	COL='#0082ff'
+elif (( $T <= -10 ))
+then
+	COL='#008bff'
+elif (( $T <= -9 ))
+then
+	COL='#0090ff'
+elif (( $T <= -8 ))
+then
+	COL='#009bff'
+elif (( $T <= -7 ))
+then
+	COL='#00a0ff'
+elif (( $T <= -6 ))
+then
+	COL='#00acff'
+elif (( $T <= -5 ))
+then
+	COL='#00b2ff'
+elif (( $T <= -4 ))
+then
+	COL='#00bfff'
+elif (( $T <= -3 ))
+then
+	COL='#00c7ff'
+elif (( $T <= -2 ))
+then
+	COL='#00d7ff'
+elif (( $T <= -1 ))
+then
+	COL='#00e0ff'
+elif (( $T <= 0 ))
+then
+	COL='#00f4ff'
+elif (( $T <= 1 ))
+then
+	COL='#00ffff'
+elif (( $T <= 2 ))
+then
+	COL='#00ffcd'
+elif (( $T <= 3 ))
+then
+	COL='#00ffa5'
+elif (( $T <= 4 ))
+then
+	COL='#00ff7d'
+elif (( $T <= 5 ))
+then
+	COL='#00ff4d'
+elif (( $T <= 6 ))
+then
+	COL='#00ff00'
+elif (( $T <= 7 ))
+then
+	COL='#3dff00'
+elif (( $T <= 8 ))
+then
+	COL='#64ff00'
+elif (( $T <= 9 ))
+then
+	COL='#81ff00'
+elif (( $T <= 10 ))
+then
+	COL='#97ff00'
+elif (( $T <= 11 ))
+then
+	COL='#aaff00'
+elif (( $T <= 12 ))
+then
+	COL='#bbff00'
+elif (( $T <= 13 ))
+then
+	COL='#cbff00'
+elif (( $T <= 14 ))
+then
+	COL='#dbff00'
+elif (( $T <= 15 ))
+then
+	COL='#ecff00'
+elif (( $T <= 16 ))
+then
+	COL='#ffff00'
+elif (( $T <= 17 ))
+then
+	COL='#fff500'
+elif (( $T <= 18 ))
+then
+	COL='#ffec00'
+elif (( $T <= 19 ))
+then
+	COL='#ffec00'
+elif (( $T <= 20 ))
+then
+	COL='#ffe400'
+elif (( $T <= 21 ))
+then
+	COL='#ffd800'
+elif (( $T <= 22 ))
+then
+	COL='#ffd300'
+elif (( $T <= 23 ))
+then
+	COL='#ffcb00'
+elif (( $T <= 24 ))
+then
+	COL='#ffc300'
+elif (( $T <= 25 ))
+then
+	COL='#ffbb00'
+elif (( $T <= 26 ))
+then
+	COL='#ffb300'
+elif (( $T <= 27 ))
+then
+	COL='#ffaa00'
+elif (( $T <= 28 ))
+then
+	COL='#ffa100'
+elif (( $T <= 29 ))
+then
+	COL='#ff9700'
+elif (( $T <= 30 ))
+then
+	COL='#ff8c00'
+elif (( $T <= 31 ))
+then
+	COL='#ff8100'
+elif (( $T <= 32 ))
+then
+	COL='#ff7400'
+elif (( $T <= 33 ))
+then
+	COL='#ff6400'
+elif (( $T <= 34 ))
+then
+	COL='#ff5300'
+elif (( $T <= 35 ))
+then
+	COL='#ff3d00'
+elif (( $T <= 36 ))
+then
+	COL='#ff2300'
+else
+	COL='#ff0000'
+fi
+
+echo $S" <span color='"$COL"'>"$T'</span>°C'
