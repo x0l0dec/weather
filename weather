@@ -1,0 +1,53 @@
+#!/bin/zsh
+
+# возможна более лучшая проверка доступности интернета (наверное)
+# wget -q --spider http://google.com
+waitint() {
+        ping -c 1 google.com > /dev/null
+        while [ $? -ne 0 ]
+        do
+                ping -c 1 google.com > /dev/null
+                sleep 120
+        done
+}
+
+#waitinit
+if [ -f ~/.cache/loc ]; then
+	LAT=$(tail -2 ~/.cache/loc | head -1 | awk -F, '{print $1}')
+	LON=$(tail -2 ~/.cache/loc | head -1 | awk -F, '{print $2}')
+	if [[ -z $LAT || -z $LON ]]; then
+		WEATHER="$(curl -s "http://ru.wttr.in/?M&m&q&format=v2" | head -n -1)"
+		SH="$(echo $WEATHER | head -n -3 | tail -1 | cut -d ' ' -f 3- | awk -F'°' '{print $1}')""°C"
+		WEATHER="$(echo $WEATHER | head -n -4 | sed 30d | sed 29d | sed 35d | sed 2d | sed 2d | sed 32d)"
+		echo $WEATHER > ~/.cache/weather
+		curl -s "http://ru.wttr.in/?M&m&q" | head -n -2 | tail +8 >> ~/.cache/weather
+		echo $SH >> ~/.cache/weather
+	else
+#		curl -s "http://ru.wttr.in/$LAT,$LON?M&m&q&format=v2" | head -n -2 > ~/.cache/weather
+		WEATHER="$(curl -s "http://ru.wttr.in/$LAT,$LON?M&m&q&format=v2" | head -n -1)"
+		LOC="$(echo $WEATHER | tail -1 | cut -c 19- | awk -F\[ '{print $1}')"
+		SH="$(echo $WEATHER | head -n -4 | tail -1 | cut -d ' ' -f 3- | awk -F'°' '{print $1}')""°C"
+		WEATHER="$(echo $WEATHER | head -n -5 | sed 30d | sed 29d | sed 35d | sed 2d | sed 2d | sed 32d)"
+		LOC='┌┤ '$LOC'├─'
+		for (( I = $(echo $LOC | wc -m) ; I < 74 ; I++ ))
+		do
+			LOC=$LOC'─'
+		done
+		LOC=$LOC'┐'
+		echo $LOC > ~/.cache/weather
+		echo $WEATHER | tail +2 >> ~/.cache/weather
+		curl -s "http://ru.wttr.in/$LAT,$LON?M&m&q" | head -n -2 | tail +8 >> ~/.cache/weather
+		echo $SH >> ~/.cache/weather
+	fi
+else
+	WEATHER="$(curl -s "http://ru.wttr.in/?M&m&q&format=v2" | head -n -1)"
+	SH="$(echo $WEATHER | head -n -3 | tail -1 | cut -d ' ' -f 3- | awk -F'°' '{print $1}')""°C"
+	WEATHER="$(echo $WEATHER | head -n -4 | sed 30d | sed 29d | sed 35d | sed 2d | sed 2d | sed 32d)"
+
+	echo $WEATHER > ~/.cache/weather
+	curl -s "http://ru.wttr.in/?M&m&q" | head -n -2 | tail +8 >> ~/.cache/weather
+	echo $SH >> ~/.cache/weather
+fi
+
+# будит i3blocks
+pkill -RTMIN+3 i3blocks

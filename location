@@ -1,0 +1,110 @@
+#!/bin/bash
+
+# возможна более лучшая проверка доступности интернета (наверное)
+# wget -q --spider http://google.com
+waitint() {
+	ping -c 1 google.com > /dev/null
+	while [ $? -ne 0 ]
+	do
+		ping -c 1 google.com > /dev/null
+		sleep 120
+	done
+}
+
+v1() {
+	# или использовать стандартный wlp2s0
+	I="$(ifconfig | grep -o 'wl\w*')"
+	if [ -z $I ]; then
+		I="$(ifconfig | grep -o 'eth[0-9]\w*')"
+		if [ -z $I ]; then
+			I="$(ifconfig | grep -o 'en[^ ]\w*')"
+		fi
+	fi
+
+	coor() {
+		# не работает !!!
+		T="$(curl -i -s -k -X 'POST' -H 'User-Agent: Dalvik/2.1.0 (Linux; U; Android 5.0.1; Nexus 5 Build/LRX22C)' -H 'Content-Type: application/x-www-form-urlencoded' 'http://mobile.maps.yandex.net/cellid_location/?clid=1866854&lac=-1&cellid=-1&operatorid=null&countrycode=null&signalstrength=-1&wifinetworks='$(iw dev $I scan dump | grep associated | awk '{print $2}' | awk -F\( '{print $1}' | awk -F: '{print $1 $2 $3 $4 $5 $6}')':-65&app=ymetro' | grep coordinates)"
+		LAT="$(echo $T | awk -F\" '{print $2}')"
+		LON="$(echo $T | awk -F\" '{print $4}')"
+	}
+	J=0
+	while [[ -z $T ]];
+	do
+		coor
+		J=$(echo $J' + 1' | bc)
+		if (($J == 4)); then
+			return 1
+		fi
+	done
+
+	TT="$(curl -s "https://timezone.bertold.org/timezone?lat=$LAT&lon=$LON" | jq '.Zones[0].TimezoneId' | cut -c 2- | rev | cut -c 2- | rev)"
+	if [[ -z $TT ]]; then
+		return 1
+	fi
+	IP="$(curl -s 'http://free.ipwhois.io/json/')"
+	if [[ "$(echo $IP | jq '.success')" -ne "true" || -z $IP ]]; then
+		return 1
+	fi
+	IP="$(echo $IP | jq '.ip' | cut -c 2- | rev | cut -c 2- | rev)"
+
+	T="$(curl -s 'https://nominatim.openstreetmap.org/reverse?format=json&lat='$LAT'&lon='$LON)"
+	if [[ "$(echo $T | jq '.error')" -ne "null" || -z $T ]]; then
+		return 1
+	fi
+	CC="$(echo $T | jq '.address.country_code' | cut -c 2- | rev | cut -c 2- | rev | tr [:lower:] [:upper:])"
+	ST="$(echo $T | jq '.address.state' | cut -c 2- | rev | cut -c 2- | rev)"
+
+	return 0
+}
+
+v2() {
+	T="$(curl -s 'http://free.ipwhois.io/json/')"
+	if [[ -z $T ]]; then
+		exit 1
+	fi
+
+	IP="$(echo $T | jq '.ip' | cut -c 2- | rev | cut -c 2- | rev)"
+	TT="$(echo $T | jq '.timezone' | cut -c 2- | rev | cut -c 2- | rev)"
+	CC="$(echo $T | jq '.country_code' | cut -c 2- | rev | cut -c 2- | rev)"
+	ST="$(echo $T | jq '.city' | cut -c 2- | rev | cut -c 2- | rev)"
+	LAT="$(echo $T | jq '.latitude')"
+	LON="$(echo $T | jq '.longitude')"
+
+	return 0
+}
+
+sun() {
+	T="$(curl -s 'https://api.sunrise-sunset.org/json?lat='$LAT'&lng='$LON'&date=today&formatted=0')"
+	if [[ "$(echo $T | jq '.status' | cut -c 2- | rev | cut -c 2- | rev)" -ne 'OK' || -z $T ]]; then
+		SR="no"
+		SS="no"
+		return 1
+	fi
+
+	D="$(TZ=$TT date '+%::z')"
+	Z="$(echo $D | grep -o '[-+]')"
+	H="$(echo $D | grep -o '[-+]..' | awk -F+ '{print $2}')"
+	M="$(echo $D | awk -F: '{print $2}')"
+	S="$(echo $D | awk -F: '{print $3}')"
+
+	SR=$(date -d $(echo $T | jq '.results.civil_twilight_begin' | grep -o '..:..:..')' today '$Z$H' hour '$Z$M' minutes'$Z$S' second' +'%H:%M:%S')
+	SS=$(date -d $(echo $T | jq '.results.civil_twilight_end' | grep -o '..:..:..')' today '$Z$H' hour '$Z$M' minutes '$Z$S' second' +'%H:%M:%S')
+}
+
+waitint
+if [[ -z $1 ]]; then
+	v1
+	if [[ $? -ne 0 ]]; then
+		v2
+	fi
+else
+	v2
+fi
+
+sun
+
+echo $IP > ~/.cache/loc
+echo $TT >> ~/.cache/loc
+echo $CC $ST >> ~/.cache/loc
+echo $LAT,$LON >> ~/.cache/loc
+echo $SR'_'$SS >> ~/.cache/loc
